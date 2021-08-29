@@ -42,6 +42,10 @@ def train():
 
         rep = 100
         datasets = dict()
+
+        '''
+        依據不同的patch_size產生不同的dataset (position dataset 和 svdd dataset)
+        '''
         datasets[f'pos_64'] = PositionDataset(train_x, K=64, repeat=rep)
         datasets[f'pos_32'] = PositionDataset(train_x, K=32, repeat=rep)
         
@@ -58,10 +62,23 @@ def train():
                 module.train()
 
             for d in loader:
+                '''
+                position_dataset: patch1, patch2, pos
+                svdd_dataset: patch1, patch2 
+                '''
                 d = to_device(d, 'cuda', non_blocking=True)
                 opt.zero_grad()
 
-                loss_pos_64 = PositionClassifier.infer(cls_64, enc, d['pos_64'])
+                # TODO: 把d拿來當flow based model的data
+                '''
+                在準備dataset時, 最後會把 position和svdd dataset concat成一個 dataset 再放到 loader裡面
+                所以一個loader裡面會有: 
+                    pos_64
+                    pos_32
+                    svdd_64
+                    svdd_32
+                '''
+                loss_pos_64 = PositionClassifier.infer(cls_64, enc, d['pos_64'])  # arg: (position_classifier, encoder_hier, data)
                 loss_pos_32 = PositionClassifier.infer(cls_32, enc.enc, d['pos_32'])
                 loss_svdd_64 = SVDD_Dataset.infer(enc, d['svdd_64'])
                 loss_svdd_32 = SVDD_Dataset.infer(enc.enc, d['svdd_32'])

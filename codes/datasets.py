@@ -40,9 +40,12 @@ def generate_coords_position(H, W, K):
     return p1, p2, pos
 
 
-def generate_coords_svdd(H, W, K):
-    with task('P1'):
-        p1 = generate_coords(H, W, K)
+def generate_coords_svdd(H, W, K): 
+    '''
+    因為最後會有兩個patch: 所以會有patch1(P1), patch2(P2)
+    '''
+    with task('P1'):  
+        p1 = generate_coords(H, W, K)  
         h1, w1 = p1
 
     with task('P2'):
@@ -104,9 +107,13 @@ class SVDD_Dataset(Dataset):
 
     @staticmethod
     def infer(enc, batch):
-        x1s, x2s, = batch
+        x1s, x2s, = batch   #分別是 patch1 和 patch2
         h1s = enc(x1s)
         h2s = enc(x2s)
+        '''
+        要讓兩個patch經過encoder後的feature越近越好 （因為training過程只會放normal data）
+        SVDD loss的定義: Loss_svdd = |f(p1) - f(p')|
+        '''
         diff = h1s - h2s
         l2 = diff.norm(dim=1)
         loss = l2.mean()

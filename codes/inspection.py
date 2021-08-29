@@ -56,7 +56,15 @@ def eval_encoder_NN_multiK(enc, obj):
 
 def eval_embeddings_NN_multiK(obj, embs64, embs32, NN=1):
     emb_tr, emb_te = embs64
+
+    '''
+    先算整個patch的anomaly map
+    '''
     maps_64 = measure_emb_NN(emb_te, emb_tr, method='kdt', NN=NN)
+
+    '''
+    Patch-wise calculated anomaly scores are then distributed to the pixels
+    '''
     maps_64 = distribute_scores(maps_64, (256, 256), K=64, S=16)
     det_64, seg_64 = assess_anomaly_maps(obj, maps_64)
 
@@ -64,10 +72,13 @@ def eval_embeddings_NN_multiK(obj, embs64, embs32, NN=1):
     maps_32 = measure_emb_NN(emb_te, emb_tr, method='ngt', NN=NN)
     maps_32 = distribute_scores(maps_32, (256, 256), K=32, S=4)
     det_32, seg_32 = assess_anomaly_maps(obj, maps_32)
-
+    
     maps_sum = maps_64 + maps_32
     det_sum, seg_sum = assess_anomaly_maps(obj, maps_sum)
 
+    print(f"inspection.eval_embeddings_NN_multiK print shape: ")
+    print(f"maps_64: {maps_64.shape}")
+    print(f"maps_32: {maps_32.shape}")
     maps_mult = maps_64 * maps_32
     det_mult, seg_mult = assess_anomaly_maps(obj, maps_mult)
 
@@ -94,11 +105,37 @@ def eval_embeddings_NN_multiK(obj, embs64, embs32, NN=1):
 ########################
 
 def measure_emb_NN(emb_te, emb_tr, method='kdt', NN=1):
+    '''
+    --64--
+    D: 64
+    emb_tr shape: (209, 13, 13, 64)
+    train_emb_all shape: (35321, 64)
+
+    --32--
+    D: 64
+    emb_tr shape: (209, 57, 57, 64)
+    train_emb_all shape: (679041, 64)
+
+    l2_maps shape: (83, 13, 13, 1)
+
+    '''
     from .nearest_neighbor import search_NN
     D = emb_tr.shape[-1]
+    # print(f"inspection.measure_emb_NN print shape: ")
+    # print(f"D: {D}")  #64
+    # print(f"emb_tr shape: {emb_tr.shape}")
+    
     train_emb_all = emb_tr.reshape(-1, D)
+    # print(f"train_emb_all shape: {train_emb_all.shape}")
 
     l2_maps, _ = search_NN(emb_te, train_emb_all, method=method, NN=NN)
+
+    # print("inspection.measure_emb_NN print shape: ")
+    # print(f"l2_maps: {l2_maps.shape}")
+
+    # the average anomaly scores of every patch denotes the resulting anomaly map as M
     anomaly_maps = np.mean(l2_maps, axis=-1)
+    # print(f"anomaly_maps: {anomaly_maps.shape}")  # (83, 13, 13)
+
 
     return anomaly_maps

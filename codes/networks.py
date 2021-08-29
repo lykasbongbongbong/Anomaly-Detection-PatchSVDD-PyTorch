@@ -52,23 +52,53 @@ class Encoder(nn.Module):
 
 
 def forward_hier(x, emb_small, K):
+    '''
+    Shape: 
+        x: (64, 3, 64, 64)   單一個patch
+        x{n}: (64, 3, 32, 32) 把64*64的patch分成32*32 4個小patch x1, x2, x3, x4
+        xx: (256, 3, 32, 32) 把小patch aggregate成一個single feature p
+        hh: (256, 64, 1, 1)  經過兩層conv（128 channel, 64 channel）得出來的output hh 
+        h{n}: (64, 64, 1, 1)
+        h{nn}: (64, 64, 1, 2)
+        h: (64, 64, 2, 2)
+    '''
     K_2 = K // 2
-    n = x.size(0)
-    x1 = x[..., :K_2, :K_2]
+    n = x.size(0)    # batch_size: 64
+    x1 = x[..., :K_2, :K_2]  # x[..., :32, :32] 第一個dim全取, 第二個dim取32到結束, 第三個dim取0~31
     x2 = x[..., :K_2, K_2:]
     x3 = x[..., K_2:, :K_2]
     x4 = x[..., K_2:, K_2:]
-    xx = torch.cat([x1, x2, x3, x4], dim=0)
+
+    # print(f"(network.forward_hier) Printing Shape: ")
+    # print(f"x shape: {x.shape}")
+    # print(f"x.size(0) n: {n}")
+    # print(f"x1 shape: {x1.shape}")
+    # print(f"x2 shape: {x2.shape}")
+    # print(f"x3 shape: {x3.shape}")
+    # print(f"x4 shape: {x4.shape}")
+
+    xx = torch.cat([x1, x2, x3, x4], dim=0)   # feature aggregate 成 feature p (aggregate to produce a single feature)
+    # print(f"xx shape: {xx.shape}") 
+
     hh = emb_small(xx)
+    # print(f"hh shape: {hh.shape}")
 
     h1 = hh[:n]
     h2 = hh[n: 2 * n]
     h3 = hh[2 * n: 3 * n]
     h4 = hh[3 * n:]
+    # print(f"h1 shape: {h1.shape}")
+    # print(f"h2 shape: {h2.shape}")
+    # print(f"h3 shape: {h3.shape}")
+    # print(f"h4 shape: {h4.shape}")
 
     h12 = torch.cat([h1, h2], dim=3)
     h34 = torch.cat([h3, h4], dim=3)
     h = torch.cat([h12, h34], dim=2)
+    # print(f"h12 shape: {h12.shape}")
+    # print(f"h34 shape: {h34.shape}")
+    # print(f"h shape: {h.shape}")
+    
     return h
 
 
@@ -133,15 +163,30 @@ class EncoderHier(nn.Module):
     def __init__(self, K, D=64, bias=True):
         super().__init__()
 
-        if K > 64:
+        '''
+        因為瑕疵大小不確定, 用多尺度的encoder可以幫忙識別各種大小的瑕疵。
+        文章採用 K=64, 32 這兩種大小
+
+        將(64, 64)的patch分成4個(32, 32)的小patch
+        f_small：  
+            input (1, 32, 32)
+            output(64, 1, 1)
+        f_big:
+            input (batchsize, 64, 2, 2)
+            中間包含兩個convolution, 分別是 128 channel的2*2 和 64 channel的1*1, 
+            將輸出轉換成 output (batchsize, 64, 1, 1)
+        '''
+
+        if K > 64:   # K 什麼時候會大於 64
             self.enc = EncoderHier(K // 2, D, bias=bias)
 
         elif K == 64:
-            self.enc = EncoderDeep(K // 2, D, bias=bias)
+            self.enc = EncoderDeep(K // 2, D, bias=bias)  # D 是embedding output的dimension, K是receptive field（patch size）
 
         else:
             raise ValueError()
 
+        # f_big 中間的兩個convolution, 分別是 128 channel 和 64
         self.conv1 = nn.Conv2d(D, 128, 2, 1, 0, bias=bias)
         self.conv2 = nn.Conv2d(128, D, 1, 1, 0, bias=bias)
 
@@ -149,7 +194,7 @@ class EncoderHier(nn.Module):
         self.D = D
 
     def forward(self, x):
-        h = forward_hier(x, self.enc, K=self.K)
+        h = forward_hier(x, self.enc, K=self.K)   # patch, encoder_small(f_small), patchsize
 
         h = self.conv1(h)
         h = F.leaky_relu(h, 0.1)
@@ -240,6 +285,11 @@ class PositionClassifier(nn.Module):
 
     @staticmethod
     def infer(c, enc, batch):
+        '''
+        c: classifier
+        enc: encoder (EncoderHier)
+        '''
+
         x1s, x2s, ys = batch
 
         h1 = enc(x1s)
