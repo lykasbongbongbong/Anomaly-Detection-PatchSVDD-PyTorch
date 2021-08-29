@@ -110,6 +110,7 @@ def get_mean(obj):
 def detection_auroc(obj, anomaly_scores):
     label = get_label(obj)  # 1: anomaly 0: normal
     auroc = roc_auc_score(label, anomaly_scores)
+    print(f"mvtecad.detection_auroc: auroc{auroc}")
     return auroc
 
 

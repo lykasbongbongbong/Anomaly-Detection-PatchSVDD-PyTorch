@@ -71,6 +71,8 @@ def eval_embeddings_NN_multiK(obj, embs64, embs32, NN=1):
     emb_tr, emb_te = embs32
     maps_32 = measure_emb_NN(emb_te, emb_tr, method='ngt', NN=NN)
     maps_32 = distribute_scores(maps_32, (256, 256), K=32, S=4)
+
+    
     det_32, seg_32 = assess_anomaly_maps(obj, maps_32)
     
     maps_sum = maps_64 + maps_32
@@ -118,6 +120,8 @@ def measure_emb_NN(emb_te, emb_tr, method='kdt', NN=1):
 
     l2_maps shape: (83, 13, 13, 1)
 
+    emb_te shape: (83, 13, 13, 64)
+
     '''
     from .nearest_neighbor import search_NN
     D = emb_tr.shape[-1]
@@ -129,6 +133,7 @@ def measure_emb_NN(emb_te, emb_tr, method='kdt', NN=1):
     # print(f"train_emb_all shape: {train_emb_all.shape}")
 
     l2_maps, _ = search_NN(emb_te, train_emb_all, method=method, NN=NN)
+    print(f"emb_te shape: {emb_te.shape}")
 
     # print("inspection.measure_emb_NN print shape: ")
     # print(f"l2_maps: {l2_maps.shape}")

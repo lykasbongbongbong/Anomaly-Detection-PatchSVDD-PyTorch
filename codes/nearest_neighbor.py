@@ -21,19 +21,19 @@ def search_NN(test_emb, train_emb_flat, NN=1, method='kdt'):
     from sklearn.neighbors import KDTree
     kdt = KDTree(train_emb_flat) 
 
-    Ntest, I, J, D = test_emb.shape
+    Ntest, I, J, D = test_emb.shape  # (83, 13, 13, 64)
     closest_inds = np.empty((Ntest, I, J, NN), dtype=np.int32)
     l2_maps = np.empty((Ntest, I, J, NN), dtype=np.float32)
 
-    for n in range(Ntest):
-        for i in range(I):
+    for n in range(Ntest): #83
+        for i in range(I): #13
             '''
             dists: NN個最接近的neighbor的距離, 也會用他的值來畫anomaly map
             inds: NN個最接近的neighbor
             '''
             dists, inds = kdt.query(test_emb[n, i, :, :], return_distance=True, k=NN)
             closest_inds[n, i, :, :] = inds[:, :]
-            l2_maps[n, i, :, :] = dists[:, :]
+            l2_maps[n, i, :, :] = dists[:, :]   # 等於用他的anomaly score當成 map
 
     return l2_maps, closest_inds
 
