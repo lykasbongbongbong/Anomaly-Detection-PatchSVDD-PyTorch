@@ -51,7 +51,7 @@ def main():
     enc.eval()
     results = eval_encoder_NN_multiK(enc, obj)
     maps = results['maps_mult']
-
+ 
     save_maps(obj, maps)
 
 

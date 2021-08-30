@@ -1,15 +1,19 @@
 import numpy as np
 import os
 import _pickle as p
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
 import torch
 from contextlib import contextmanager
 from PIL import Image
+from torchvision import datasets, transforms
+from torchvision.transforms.functional import rotate
+import config as c
+from codes.multi_transform_loader import ImageFolderMultiTransform
 
 
 __all__ = ['crop_image_CHW', 'PatchDataset_NCHW', 'NHWC2NCHW_normalize', 'NHWC2NCHW',
            'save_binary', 'load_binary', 'makedirpath', 'task', 'DictionaryConcatDataset',
-           'to_device', 'distribute_scores', 'resize']
+           'to_device', 'distribute_scores', 'resize', 'get_loss', 't2np']
 
 
 def to_device(obj, device, non_blocking=False):
@@ -178,3 +182,20 @@ def distribute_score(score_mask, output_shape, K: int, S: int) -> np.ndarray:
 
 def resize(image, shape=(256, 256)):
     return np.array(Image.fromarray(image).resize(shape[::-1]))
+
+
+'''
+# DifferNet class / methods 
+'''
+
+
+def t2np(tensor):
+    '''pytorch tensor -> numpy array'''
+    return tensor.cpu().data.numpy() if tensor is not None else None
+
+
+def get_loss(z, jac):
+    '''check equation 4 of the paper why this makes sense - oh and just ignore the scaling here'''
+    return torch.mean(0.5 * torch.sum(z ** 2, dim=(1,)) - jac) / z.shape[1]
+
+

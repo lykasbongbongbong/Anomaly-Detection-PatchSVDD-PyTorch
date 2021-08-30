@@ -3,12 +3,36 @@ import torch
 import torch.nn.functional as F
 import math
 from .utils import makedirpath
+from torchvision import models
+__all__ = ['EncoderHier', 'Encoder', 'PositionClassifier', 'Vgg16']
 
-__all__ = ['EncoderHier', 'Encoder', 'PositionClassifier']
+class Vgg16(nn.Module):
+    def __init__(self, pretrained = True):
+        super(Vgg16, self).__init__()
+        self.vggnet = models.vgg16(pretrained)
+        del(self.vggnet.classifier) # Remove fully connected layer to save memory.
+        features = list(self.vggnet.features)
+        self.layers = nn.ModuleList(features).eval() 
+        
+    def forward(self, x, size='large'):
+        results = []
+        if size == 'large':
+            for ii,model in enumerate(self.layers):
+                x = model(x)
+                if ii in [3,8,15,22,29]:
+                    results.append(x)
+            return results
+        else:
+            for ii,model in enumerate(self.layers):
+                if ii <= 15:
+                    x = model(x)
+                    if ii in [3,8,15]:
+                        results.append(x)
+            return results
 
 
 class Encoder(nn.Module):
-    def __init__(self, K, D=64, bias=True):
+    def __init__(self, pretrained_net, K, D=64, bias=True):
         super().__init__()
 
         self.conv1 = nn.Conv2d(3, 64, 5, 2, 0, bias=bias)
@@ -19,8 +43,11 @@ class Encoder(nn.Module):
         self.K = K
         self.D = D
         self.bias = bias
+        
+        self.pretrained_net = pretrained_net 
 
     def forward(self, x):
+        h = self.pretrained_net(x)[4]
         h = self.conv1(x)
         h = F.leaky_relu(h, 0.1)
 
@@ -103,7 +130,7 @@ def forward_hier(x, emb_small, K):
 
 
 class EncoderDeep(nn.Module):
-    def __init__(self, K, D=64, bias=True):
+    def __init__(self, pretrained_net, K, D=64, bias=True):
         super().__init__()
 
         self.conv1 = nn.Conv2d(3, 32, 3, 2, 0, bias=bias)
@@ -117,6 +144,7 @@ class EncoderDeep(nn.Module):
 
         self.K = K
         self.D = D
+        self.pretrained_net = pretrained_net
 
     def forward(self, x):
         h = self.conv1(x)
